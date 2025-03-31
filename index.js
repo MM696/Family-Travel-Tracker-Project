@@ -31,7 +31,7 @@ let users = [
 
 async function checkVisited() {
     const result = await pool.query(
-      "SELECT country_code FROM visited_countries JOIN users ON users.id = user_id = $1;",
+      "SELECT country_code FROM visited_countries JOIN users ON users.id = user_id WHERE user_id = $1; ",
       [currentUserId]
     );
 
@@ -58,7 +58,7 @@ app.get("/", async (req, res) => {
     }
 
     res.render("index.ejs", {
-      countries,
+      countries: countries,
       total: countries.length,
       users: users,
       color: currentUser.color,
@@ -95,7 +95,7 @@ app.post("/add", async (req, res) => {
   }
 });
 
-app.post("/user", (req, res) => {
+app.post("/user", async (req, res) => {
   if (req.body.add === "new") {
     res.render("new.ejs");
   } else {
@@ -109,7 +109,7 @@ app.post("/new", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "INSERT INTO users (name, color) VALUES ($1, $2) RETURNING *;",
+      "INSERT INTO users (name, color) VALUES($1, $2) RETURNING *;",
       [name, color]
     );
 
