@@ -29,46 +29,34 @@ let users = [
   { id: 2, name: "Jack", color: "powderblue" },
 ];
 
-async function checkVisited() {
-    const result = await pool.query(
-      "SELECT country_code FROM visited_countries JOIN users ON users.id = user_id WHERE user_id = $1; ",
-      [currentUserId]
-    );
-
-    let countries = [];
-    result.rows.forEach((country) => {
-      countries.push(country.country_code);
-    });
-    return countries;
-  }
+async function checkVisisted() {
+  const result = await pool.query(
+    "SELECT country_code FROM visited_countries JOIN users ON users.id = user_id WHERE user_id = $1; ",
+    [currentUserId]
+  );
+  let countries = [];
+  result.rows.forEach((country) => {
+    countries.push(country.country_code);
+  });
+  return countries;
+}
 
 async function getCurrentUser() {
-    const result = await pool.query("SELECT * FROM users");
-    users = result.rows;
-    return users.find((user) => user.id == currentUserId);
+  const result = await pool.query("SELECT * FROM users");
+  users = result.rows;
+  return users.find((user) => user.id == currentUserId);
 }
 
 app.get("/", async (req, res) => {
-  try {
-    const countries = await checkVisited();
-    const currentUser = await getCurrentUser();
-
-    if (!currentUser) {
-      return res.status(404).send("User not found");
-    }
-
-    res.render("index.ejs", {
-      countries: countries,
-      total: countries.length,
-      users: users,
-      color: currentUser.color,
-    });
-  } catch (err) {
-    console.error("Error in GET /:", err);
-    res.status(500).send("Internal Server Error");
-  }
+  const countries = await checkVisisted();
+  const currentUser = await getCurrentUser();
+  res.render("index.ejs", {
+    countries: countries,
+    total: countries.length,
+    users: users,
+    color: currentUser.color,
+  });
 });
-
 app.post("/add", async (req, res) => {
   const input = req.body["country"];
   const currentUser = await getCurrentUser();
@@ -105,19 +93,16 @@ app.post("/user", async (req, res) => {
 });
 
 app.post("/new", async (req, res) => {
-  const { name, color } = req.body;
+  const name = req.body.name;
+  const color = req.body.color;
 
-  try {
-    const result = await pool.query(
-      "INSERT INTO users (name, color) VALUES($1, $2) RETURNING *;",
-      [name, color]
-    );
+  const result = await pool.query(
+    "INSERT INTO users (name, color) VALUES($1, $2) RETURNING *;",
+    [name, color]
+  );
 
-      const id = result.rows[0].id;
-      currentUserId = id;
-  } catch (err) {
-    console.error("Error creating new user:", err);
-  }
+  const id = result.rows[0].id;
+  currentUserId = id;
 
   res.redirect("/");
 });
