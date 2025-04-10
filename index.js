@@ -11,10 +11,11 @@ const port = 3000;
 // PostgreSQL Connection Setup
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false }, // Enable SSL for Render
+  ssl: process.env.DATABASE_URL.includes("localhost")
+    ? false
+    : { rejectUnauthorized: false }, // Enable SSL for Render
 });
 
-// Test database connection
 pool.connect()
   .then(() => console.log("Connected to PostgreSQL"))
   .catch((err) => console.error("Database connection error:", err));
@@ -31,35 +32,51 @@ let users = [
 
 async function checkVisisted() {
   const result = await pool.query(
-    "SELECT country_code FROM visited_countries JOIN users ON users.id = user_id WHERE user_id = $1; ",
+    "SELECT country_code FROM visited_countries WHERE user_id = $1;",
     [currentUserId]
   );
-  let countries = [];
-  result.rows.forEach((country) => {
-    countries.push(country.country_code);
-  });
-  return countries;
+  return result.rows.map((row) => row.country_code);
 }
 
 async function getCurrentUser() {
-  const result = await pool.query("SELECT * FROM users");
-  users = result.rows;
-  return users.find((user) => user.id == currentUserId);
+  const result = await pool.query("SELECT * FROM users WHERE id = $1", [currentUserId]);
+  return result.rows[0]; // returns undefined if not found
+}
+
+async function getAllUsers() {
+  const result = await pool.query("SELECT * FROM users;");
+  return result.rows;
 }
 
 app.get("/", async (req, res) => {
-  const countries = await checkVisisted();
-  const currentUser = await getCurrentUser();
-  res.render("index.ejs", {
-    countries: countries,
-    total: countries.length,
-    users: users,
-    color: currentUser.color,
-  });
+  try {
+    const countries = await checkVisisted();
+    const currentUser = await getCurrentUser();
+    users = await getAllUsers();
+
+    if (!currentUser) {
+      return res.status(404).send("User not found.");
+    }
+
+    res.render("index.ejs", {
+      countries: countries,
+      total: countries.length,
+      users: users,
+      color: currentUser.color,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server error.");
+  }
 });
+
 app.post("/add", async (req, res) => {
   const input = req.body["country"];
   const currentUser = await getCurrentUser();
+
+  if (!currentUser) {
+    return res.status(404).send("User not found.");
+  }
 
   try {
     const result = await pool.query(
@@ -68,6 +85,10 @@ app.post("/add", async (req, res) => {
     );
 
     const data = result.rows[0];
+    if (!data) {
+      return res.status(404).send("Country not found.");
+    }
+
     const countryCode = data.country_code;
     try {
       await pool.query(
@@ -77,9 +98,11 @@ app.post("/add", async (req, res) => {
       res.redirect("/");
     } catch (err) {
       console.log(err);
+      res.status(500).send("Error saving country.");
     }
   } catch (err) {
     console.log(err);
+    res.status(500).send("Error querying country.");
   }
 });
 
@@ -87,7 +110,7 @@ app.post("/user", async (req, res) => {
   if (req.body.add === "new") {
     res.render("new.ejs");
   } else {
-    currentUserId = req.body.user;
+    currentUserId = Number(req.body.user);
     res.redirect("/");
   }
 });
@@ -96,15 +119,20 @@ app.post("/new", async (req, res) => {
   const name = req.body.name;
   const color = req.body.color;
 
-  const result = await pool.query(
-    "INSERT INTO users (name, color) VALUES($1, $2) RETURNING *;",
-    [name, color]
-  );
+  try {
+    const result = await pool.query(
+      "INSERT INTO users (name, color) VALUES($1, $2) RETURNING *;",
+      [name, color]
+    );
 
-  const id = result.rows[0].id;
-  currentUserId = id;
+    const id = result.rows[0].id;
+    currentUserId = id;
 
-  res.redirect("/");
+    res.redirect("/");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Failed to create new user.");
+  }
 });
 
 app.listen(port, () => {
