@@ -32,7 +32,7 @@ let users = [
 
 async function checkVisited() {
     const result = await pool.query(
-      "SELECT country_code FROM visited_countries JOIN users ON users.id = user_id WHERE user_id = $1; ",
+      "SELECT country_code FROM visited_countries JOIN users_table ON users_table.id = user_id WHERE user_id = $1; ",
       [currentUserId]
     );
 
