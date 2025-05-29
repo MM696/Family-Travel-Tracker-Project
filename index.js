@@ -44,7 +44,7 @@ async function checkVisited() {
   }
 
 async function getCurrentUser() {
-    const result = await pool.query("SELECT * FROM users");
+    const result = await pool.query("SELECT * FROM users_table");
     users = result.rows;
     return users.find((user) => user.id == currentUserId);
 }
@@ -120,7 +120,7 @@ app.post("/new", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "INSERT INTO users (name, color) VALUES($1, $2) RETURNING *;",
+      "INSERT INTO users_table (name, color) VALUES($1, $2) RETURNING *;",
       [name, color]
     );
     const id = result.rows[0].id;
